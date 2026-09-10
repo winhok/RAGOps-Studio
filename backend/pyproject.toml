@@ -1,0 +1,22 @@
+[project]
+name = "ragops-studio-backend"
+version = "0.1.0"
+description = "Production-oriented RAG portfolio backend with hybrid retrieval, citations, ACL, versioning, evaluation and traces."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.116.1",
+  "uvicorn[standard]==0.35.0",
+  "pydantic==2.11.7",
+  "python-multipart==0.0.20",
+  "pypdf==5.9.0",
+  "python-docx==1.2.0",
+  "openai>=1.75,<2",
+  "qdrant-client>=1.14,<2",
+  "langgraph>=0.6,<1",
+]
+
+[tool.ruff]
+line-length = 110
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

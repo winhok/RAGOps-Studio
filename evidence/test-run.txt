@@ -1,0 +1,41 @@
+.......................................................sss.............. [ 91%]
+.......                                                                  [100%]
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.5-final-0 ________________
+
+Name                                   Stmts   Miss  Cover
+----------------------------------------------------------
+backend/app/__init__.py                    0      0   100%
+backend/app/api/__init__.py                0      0   100%
+backend/app/api/routes.py                 66      9    86%
+backend/app/api/schemas.py                33      1    97%
+backend/app/core/__init__.py               0      0   100%
+backend/app/core/auth.py                  37      4    89%
+backend/app/core/bm25.py                  32      1    97%
+backend/app/core/chunking.py              63      6    90%
+backend/app/core/config.py                68      8    88%
+backend/app/core/embeddings.py            24      1    96%
+backend/app/core/errors.py                21      0   100%
+backend/app/core/metrics.py               38      4    89%
+backend/app/core/models.py               105      3    97%
+backend/app/core/rrf.py                    8      0   100%
+backend/app/core/text.py                  24      3    88%
+backend/app/main.py                       61      1    98%
+backend/app/services/__init__.py           0      0   100%
+backend/app/services/evaluation.py        18      1    94%
+backend/app/services/graph.py            181     27    85%
+backend/app/services/parsing.py           31     15    52%
+backend/app/services/pipeline.py          36      0   100%
+backend/app/services/providers.py        194     19    90%
+backend/app/services/retrieval.py         33      0   100%
+backend/app/services/runtime.py           26      4    85%
+backend/app/services/store.py            206     15    93%
+backend/app/services/vector_index.py     120     75    38%
+----------------------------------------------------------
+TOTAL                                   1425    197    86%
+Coverage JSON written to file evidence/coverage.json
+=========================== short test summary info ============================
+SKIPPED [1] backend/tests/test_integrations.py:10: Optional LangGraph SDK is not installed
+SKIPPED [1] backend/tests/test_integrations.py:21: Set RUN_MILVUS_TESTS=1 with a running Milvus 2.6 instance
+SKIPPED [1] backend/tests/test_integrations.py:41: Set RUN_ZHIPU_TESTS=1 and configure valid Zhipu model access; API calls incur cost
+76 passed, 3 skipped in 3.49s

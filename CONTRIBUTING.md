@@ -1,6 +1,5 @@
 # Contributing
 
-1. Keep the bundled demo data fictional and free of employer/client information.
-2. Add regression cases for retrieval, ACL, or versioning behavior changes.
-3. Run `make test` and `make eval` before opening a pull request.
-4. Do not commit `.env`, API keys, database files, or private documents.
+Run `python -m pytest -q` and `npm run build --prefix frontend` before proposing a change. Keep external-service tests opt-in and label simulated HTTP transport tests as contracts, not live integrations. Add a regression test whenever changing source visibility, publication, evidence routing or citation validation.
+
+Do not commit `.env`, `.secrets`, `.state`, provider keys, customer data or access tokens. Use only the supplied synthetic reference data in recorded examples. Keep scope mapped to `docs/REFERENCE-MAP.md`; do not add unrelated agent tooling as part of a bug fix.

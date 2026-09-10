@@ -1,0 +1,21 @@
+{
+  "checks": [
+    "Multi-source query: answered with two bound citations",
+    "Bound citation opens its exact immutable stored source",
+    "Trace displays two actual retrieval rounds and scores",
+    "Missing user amount asks clarification with zero citations",
+    "Superseded maintenance evidence correctly refuses",
+    "Evaluation button executes actual server-side regression",
+    "Customer-service identity cannot read finance sources or edit documents",
+    "Administrator can open the document editor with ACL and revision inputs",
+    "Document editor publishes the supplied version update through the actual API",
+    "Identical publication is skipped without creating a third revision",
+    "Version-history view shows persisted source revision",
+    "Question after update uses only the latest 5000 CNY source revision",
+    "Tenant administrator can answer the same restricted finance question",
+    "Mobile document width fits viewport"
+  ],
+  "browser_errors": [],
+  "browser": "Chromium with local HTTP transport bridge",
+  "remote_llm_used": false
+}

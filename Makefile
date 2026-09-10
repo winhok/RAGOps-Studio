@@ -1,16 +1,11 @@
-.PHONY: test eval api web docker
-
+.PHONY: install bootstrap serve test web
+install:
+	python -m pip install -r backend/requirements-dev.txt
+bootstrap:
+	python scripts/bootstrap.py --with-sample-data
+serve:
+	python scripts/serve.py
 test:
-	cd backend && PYTHONPATH=. python -m unittest discover -s tests -v
-
-eval:
-	python backend/scripts/seed_and_eval.py
-
-api:
-	cd backend && PYTHONPATH=. uvicorn app.main:app --reload --port 8000
-
+	python -m pytest -q
 web:
-	cd frontend && npm run dev
-
-docker:
-	docker compose up --build
+	npm run build --prefix frontend

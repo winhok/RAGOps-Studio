@@ -1,36 +1,24 @@
-import type { ChatAnswer, Evaluation, Trace } from './types'
-
-const API = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  })
-  if (!response.ok) throw new Error(await response.text())
-  return response.json() as Promise<T>
+export class ApiError extends Error {
+    constructor(message: string, public status: number, public traceId?: string) { super(message); }
 }
-
-export function chat(query: string, role: string): Promise<ChatAnswer> {
-  return request('/api/chat', {
-    method: 'POST',
-    body: JSON.stringify({ query, role, top_k: 5 }),
-  })
-}
-
-export function getTrace(traceId: string): Promise<Trace> {
-  return request(`/api/traces/${traceId}`)
-}
-
-export function runEvaluation(): Promise<Evaluation> {
-  return request('/api/evaluate', { method: 'POST', body: JSON.stringify({ k: 5 }) })
-}
-
-export function ingestText(payload: {
-  source_id: string
-  title: string
-  content: string
-  allowed_roles: string[]
-}): Promise<unknown> {
-  return request('/api/documents/ingest-text', { method: 'POST', body: JSON.stringify(payload) })
+let credential = sessionStorage.getItem('ragops.credential') || '';
+export function setCredential(value: string) { credential = value; if (value)
+    sessionStorage.setItem('ragops.credential', value);
+else
+    sessionStorage.removeItem('ragops.credential'); }
+export function hasCredential() { return !!credential; }
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const headers = new Headers(options.headers);
+    headers.set('Authorization', `Bearer ${credential}`);
+    if (options.body && !(options.body instanceof FormData))
+        headers.set('Content-Type', 'application/json');
+    const response = await fetch(path, { ...options, headers });
+    const data = await response.json();
+    if (!response.ok) {
+        const detail = typeof data.detail === 'string' ? data.detail : Array.isArray(data.detail) ? data.detail.map((e: {
+            msg: string;
+        }) => e.msg).join('; ') : '';
+        throw new ApiError(data.error?.message || detail || 'Request failed', response.status, data.error?.trace_id);
+    }
+    return data as T;
 }

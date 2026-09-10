@@ -1,56 +1,37 @@
 from __future__ import annotations
-
+import time
+from dataclasses import asdict
+from app.core.models import Principal
+from app.core.errors import ProviderError
 from dataclasses import replace
-
-from app.core.bm25 import BM25Index
-from app.core.embeddings import EmbeddingProvider, HashEmbeddingProvider
-from app.core.models import Chunk, RetrievalHit
-from app.core.rrf import reciprocal_rank_fusion
-from app.core.text import overlap_score
-from app.services.vector_index import DenseIndex, InMemoryDenseIndex
-
+from app.services.vector_index import permission_filter
 
 class HybridRetriever:
-    def __init__(self, embedding_provider: EmbeddingProvider | None = None, dense_index: DenseIndex | None = None) -> None:
-        self.embedding_provider = embedding_provider or HashEmbeddingProvider()
-        self.dense_index = dense_index or InMemoryDenseIndex(self.embedding_provider)
 
-    def retrieve(self, query: str, chunks: list[Chunk], *, top_k: int = 5) -> list[RetrievalHit]:
+    def __init__(self, store, embeddings, index, reranker):
+        self.store, self.embeddings, self.index, self.reranker = (store, embeddings, index, reranker)
+
+    def retrieve(self, query: str, principal: Principal, evidence_type: str, top_k: int=4):
+        started = time.perf_counter()
+        chunks = self.store.snapshot(principal, evidence_type)
+        acl_ms = (time.perf_counter() - started) * 1000
         if not chunks:
-            return []
+            return ([], {'acl': round(acl_ms, 2), 'embedding': 0, 'retrieval': 0, 'rerank': 0}, 0)
+        now = time.perf_counter()
+        vector = self.embeddings.embed(query)
+        embed_ms = (time.perf_counter() - now) * 1000
+        now = time.perf_counter()
+        hits = self.index.search(query, vector, chunks, principal, max(12, top_k * 3))
+        retrieval_ms = (time.perf_counter() - now) * 1000
+        authorized = {chunk.id: chunk for chunk in chunks}
+        if any((hit.chunk.id not in authorized for hit in hits)):
+            raise ProviderError('Index result was outside the authorized snapshot')
+        hits = [replace(hit, chunk=authorized[hit.chunk.id]) for hit in hits]
+        now = time.perf_counter()
+        hits = self.reranker.rerank(query, hits, top_k)
+        rerank_ms = (time.perf_counter() - now) * 1000
+        return (hits, {'acl': round(acl_ms, 2), 'embedding': round(embed_ms, 2), 'retrieval': round(retrieval_ms, 2), 'rerank': round(rerank_ms, 2)}, len(chunks))
 
-        bm25 = BM25Index([chunk.text for chunk in chunks])
-        lexical_rank = bm25.rank(query)
-        lexical_scores = {chunks[idx].id: score for idx, score in lexical_rank}
-
-        dense_rank = self.dense_index.rank(query, chunks)
-        dense_scores = dict(dense_rank)
-
-        lexical_ids = [chunks[idx].id for idx, _ in lexical_rank]
-        dense_ids = [chunk_id for chunk_id, _ in dense_rank]
-        fused = reciprocal_rank_fusion([lexical_ids, dense_ids])
-
-        hits = [
-            RetrievalHit(
-                chunk=chunk,
-                score=fused.get(chunk.id, 0.0),
-                dense_score=dense_scores.get(chunk.id, 0.0),
-                lexical_score=lexical_scores.get(chunk.id, 0.0),
-                rrf_score=fused.get(chunk.id, 0.0),
-            )
-            for chunk in chunks
-        ]
-        hits.sort(key=lambda hit: hit.rrf_score, reverse=True)
-
-        # Lightweight reranking layer. In production this can be swapped for a
-        # cross-encoder or provider rerank API without changing the pipeline.
-        reranked: list[RetrievalHit] = []
-        candidate_count = min(len(hits), max(top_k * 3, 8))
-        for hit in hits[:candidate_count]:
-            semantic = max(hit.dense_score, 0.0)
-            overlap = overlap_score(query, hit.chunk.text)
-            rerank = 0.55 * overlap + 0.30 * semantic + 0.15 * min(hit.lexical_score / 5.0, 1.0)
-            reranked.append(replace(hit, rerank_score=rerank, score=rerank))
-
-        reranked.sort(key=lambda hit: (hit.rerank_score, hit.rrf_score), reverse=True)
-        return reranked[:top_k]
+def hit_record(hit) -> dict:
+    c = hit.chunk
+    return {'chunk_id': c.id, 'document_id': c.document_id, 'title': c.title, 'version': c.version, 'evidence_type': c.evidence_type, 'content': c.text, 'dense_score': hit.dense_score, 'lexical_score': hit.lexical_score, 'rrf_score': hit.rrf_score, 'rerank_score': hit.rerank_score, 'source_path': c.source_path, 'effective_at': c.effective_at, 'expires_at': c.expires_at}

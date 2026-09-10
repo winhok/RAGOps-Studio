@@ -1,68 +1,69 @@
 from __future__ import annotations
-
+import json
 import logging
-import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
-
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from app.api.routes import router
-from app.services.demo_seed import seed_demo_knowledge
-from app.services.graph import build_rag_graph
-from app.services.runtime import build_pipeline
-from app.services.store import SQLiteDocumentStore
-
+from app.core.auth import CredentialRegistry
+from app.core.config import Settings
+from app.core.errors import AppError
+from app.services.runtime import Runtime
 
 class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        import json
 
-        payload = {
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-        }
-        if hasattr(record, "trace_id"):
-            payload["trace_id"] = record.trace_id
+    def format(self, record):
+        payload = {'level': record.levelname, 'logger': record.name, 'message': record.getMessage()}
+        for key in ('trace_id', 'outcome', 'latency_ms', 'error_code'):
+            if hasattr(record, key):
+                payload[key] = getattr(record, key)
         return json.dumps(payload, ensure_ascii=False)
 
+def create_app(settings: Settings | None=None, runtime=None):
+    settings = settings or Settings.from_env()
 
-def configure_logging() -> None:
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JsonFormatter())
-    root = logging.getLogger()
-    root.handlers = [handler]
-    root.setLevel(os.getenv("LOG_LEVEL", "INFO"))
+    @asynccontextmanager
+    async def lifespan(app):
+        app.state.runtime = runtime or Runtime(settings)
+        app.state.credentials = CredentialRegistry(settings.principals_file)
+        yield
+        if runtime is None:
+            app.state.runtime.close()
+    app = FastAPI(title='RAGOps Studio', version='0.2.0', lifespan=lifespan)
+    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False, allow_methods=['GET', 'POST', 'PUT', 'DELETE'], allow_headers=['Authorization', 'Content-Type'])
 
+    @app.middleware('http')
+    async def headers(request: Request, call_next):
+        # Reject oversized requests before multipart parsing. Proxies must also impose a body limit.
+        length = request.headers.get('content-length')
+        if length and (not length.isdigit() or int(length) > settings.max_upload_bytes + 100000):
+            return JSONResponse({'error': {'code': 'payload_too_large', 'message': 'Request body exceeds size limit'}}, status_code=413)
+        response = await call_next(request)
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Referrer-Policy'] = 'no-referrer'
+        response.headers['X-Frame-Options'] = 'DENY'
+        if request.url.path.startswith('/api'):
+            response.headers['Cache-Control'] = 'no-store'
+        return response
 
-def create_app(root: Path | None = None) -> FastAPI:
-    configure_logging()
-    root = root or Path(__file__).resolve().parents[2]
-    db_path = Path(os.getenv("RAGOPS_DB_PATH", root / "data" / "ragops.db"))
+    @app.exception_handler(AppError)
+    async def application_error(request, exc):
+        return JSONResponse({'error': {'code': exc.code, 'message': str(exc), 'trace_id': exc.trace_id}}, status_code=exc.status_code)
 
-    app = FastAPI(title="RAGOps Studio API", version="0.1.0")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    app.state.root = root
-    app.state.store = SQLiteDocumentStore(db_path)
-    if os.getenv("RAGOPS_AUTO_SEED", "1") == "1" and not app.state.store.list_documents():
-        seed_demo_knowledge(app.state.store, root)
-    app.state.pipeline = build_pipeline(app.state.store)
-    app.state.graph = build_rag_graph(app.state.pipeline)
+    @app.get('/health')
+    def health():
+        return {'status': 'ok', 'service': 'ragops-studio', 'version': '0.2.0'}
     app.include_router(router)
-
-    @app.get("/health")
-    def health() -> dict:
-        return {"status": "ok", "service": "ragops-studio"}
-
+    public = settings.root / 'frontend/dist'
+    if public.exists():
+        app.mount('/', StaticFiles(directory=public, html=True), name='web')
     return app
-
-
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JsonFormatter())
+logging.getLogger('app').handlers = [handler]
+logging.getLogger('app').setLevel(logging.INFO)
 app = create_app()

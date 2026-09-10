@@ -1,13 +1,21 @@
+# Private runtime material
 .env
+.env.*
+!.env.example
+.secrets/
+.state*/
+volumes/
+*.sqlite3*
+*.db
+*.log
+# Python
 .venv/
 __pycache__/
-*.py[cod]
+*.pyc
 .pytest_cache/
-.ruff_cache/
+.coverage
+htmlcov/
+# Frontend
 node_modules/
-dist/
-frontend/dist/
-data/*.db
-data/*.db-*
+# frontend/dist is intentionally versioned so local startup needs no Node build.
 .DS_Store
-coverage/

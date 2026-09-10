@@ -1,0 +1,10 @@
+**/__pycache__
+**/*.pyc
+.venv
+.secrets
+.state*
+.env
+.git
+node_modules
+**/node_modules
+assets/screenshots

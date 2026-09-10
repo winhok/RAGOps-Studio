@@ -1,0 +1,7 @@
+# Optional integrations. Install only when selecting the corresponding runtime.
+# External SDK/environment checks are explicitly separated in docs/VALIDATION.md.
+-r requirements.txt
+langgraph==0.6.11
+langchain-core>=0.3.75,<0.4
+pymilvus>=2.6,<2.7
+qdrant-client>=1.14,<2

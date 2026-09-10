@@ -1,44 +1,99 @@
 [
   {
-    "query": "How long do I have to return an unused physical product?",
-    "relevant_source_ids": ["refunds"],
-    "expected_keywords": ["30", "calendar days"]
+    "tenant_id": "bluewhale",
+    "query": "蓝鲸科技现在的退款金额超过多少元需要人工审核？",
+    "relevant_source_ids": [
+      "refund-review"
+    ],
+    "expected_keywords": [
+      "2000",
+      "人工审核"
+    ]
   },
   {
-    "query": "When should support open a carrier investigation for tracking that stopped moving?",
-    "relevant_source_ids": ["shipping"],
-    "expected_keywords": ["72 hours", "carrier investigation"]
+    "tenant_id": "bluewhale",
+    "query": "订单 A2026 的咖啡机退款金额是 3500 元，需要人工审核吗？准备材料时还要注意什么？",
+    "relevant_source_ids": [
+      "refund-review",
+      "refund-material"
+    ],
+    "expected_keywords": [
+      "2000",
+      "订单号",
+      "序列号"
+    ]
   },
   {
-    "query": "Can I change my delivery address after fulfillment?",
-    "relevant_source_ids": ["shipping"],
-    "expected_keywords": ["before", "fulfillment"]
+    "tenant_id": "bluewhale",
+    "query": "咖啡机退款审核通过后多久能到账？",
+    "relevant_source_ids": [
+      "refund-review",
+      "refund-arrival"
+    ],
+    "expected_keywords": [
+      "工作日"
+    ]
   },
   {
-    "query": "Does cancelling Northstar Plus refund the current billing period?",
-    "relevant_source_ids": ["subscriptions"],
-    "expected_keywords": ["does not", "refund"]
+    "tenant_id": "bluewhale",
+    "query": "退款金额是 1500 元，需要人工审核吗？",
+    "relevant_source_ids": [
+      "refund-review"
+    ],
+    "expected_keywords": [
+      "2000"
+    ]
   },
   {
-    "query": "What secrets should support never ask a customer to share?",
-    "relevant_source_ids": ["account-security"],
-    "expected_keywords": ["passwords", "one-time passcodes"]
+    "tenant_id": "bluewhale-kb",
+    "query": "退款金额超过多少元必须人工审核？",
+    "relevant_source_ids": [
+      "company-refund"
+    ],
+    "expected_keywords": [
+      "3000"
+    ]
   },
   {
-    "query": "How long is the grace period after requesting account deletion?",
-    "relevant_source_ids": ["account-security"],
-    "expected_keywords": ["7-day", "grace period"]
+    "tenant_id": "bluewhale-kb",
+    "query": "财务负责人需要复核哪些信息？",
+    "relevant_source_ids": [
+      "finance-refund"
+    ],
+    "expected_keywords": [
+      "原支付渠道",
+      "实付金额"
+    ]
   },
   {
-    "query": "When should a pending refund be escalated to Tier 2?",
-    "relevant_source_ids": ["internal-escalation"],
-    "expected_keywords": ["10 business days", "Tier 2"],
-    "role": "support"
+    "tenant_id": "bluewhale-kb",
+    "query": "客服初审需要多久？",
+    "relevant_source_ids": [
+      "service-review"
+    ],
+    "expected_keywords": [
+      "2 个工作小时"
+    ]
   },
   {
-    "query": "What should be included in an escalation note?",
-    "relevant_source_ids": ["internal-escalation"],
-    "expected_keywords": ["timeline", "reference IDs"],
-    "role": "support"
+    "tenant_id": "starlight",
+    "query": "黑金会员的周年庆活动优惠券是多少？",
+    "relevant_source_ids": [
+      "promotion"
+    ],
+    "expected_keywords": [
+      "STAR-88",
+      "88"
+    ]
+  },
+  {
+    "tenant_id": "bluewhale-kb",
+    "query": "退款审核通过后多久能到账？",
+    "relevant_source_ids": [
+      "company-refund"
+    ],
+    "expected_keywords": [
+      "3 到 5 个工作日"
+    ]
   }
 ]

@@ -1,0 +1,104 @@
+[
+  {
+    "id": "refund-review",
+    "tenant_id": "bluewhale",
+    "title": "退款人工审核规则",
+    "file": "data/fixtures/bluewhale/refund-review.md",
+    "evidence_type": "review_rule",
+    "department_id": "customer-service",
+    "visibility": "company",
+    "effective_at": "2026-09-01T00:00:00+08:00",
+    "active": true
+  },
+  {
+    "id": "refund-material",
+    "tenant_id": "bluewhale",
+    "title": "咖啡机退款材料说明",
+    "file": "data/fixtures/bluewhale/refund-material.md",
+    "evidence_type": "material_requirement",
+    "department_id": "customer-service",
+    "visibility": "company",
+    "effective_at": "2026-08-20T00:00:00+08:00",
+    "active": true
+  },
+  {
+    "id": "refund-arrival",
+    "tenant_id": "bluewhale",
+    "title": "退款到账时间",
+    "file": "data/fixtures/bluewhale/refund-arrival.md",
+    "evidence_type": "arrival_rule",
+    "department_id": "customer-service",
+    "visibility": "company",
+    "effective_at": "2026-07-01T00:00:00+08:00",
+    "active": true
+  },
+  {
+    "id": "maintenance-old",
+    "tenant_id": "bluewhale",
+    "title": "旧版咖啡机保养说明",
+    "file": "data/fixtures/bluewhale/maintenance-old.md",
+    "evidence_type": "maintenance_policy",
+    "department_id": "customer-service",
+    "visibility": "company",
+    "effective_at": "2025-01-01T00:00:00+08:00",
+    "active": false
+  },
+  {
+    "id": "refund-other",
+    "tenant_id": "galaxy-retail",
+    "title": "星河零售退款规则",
+    "file": "data/fixtures/galaxy-retail/refund-other.md",
+    "evidence_type": "review_rule",
+    "department_id": "customer-service",
+    "visibility": "company",
+    "effective_at": "2026-09-01T00:00:00+08:00",
+    "active": true
+  },
+  {
+    "id": "company-refund",
+    "tenant_id": "bluewhale-kb",
+    "title": "蓝鲸科技退款规则",
+    "file": "data/fixtures/bluewhale-kb/company-refund.md",
+    "evidence_type": "review_rule",
+    "department_id": "customer-service",
+    "visibility": "company",
+    "effective_at": "2026-01-01T00:00:00+08:00",
+    "active": true,
+    "additional_evidence_types": [
+      "arrival_rule"
+    ]
+  },
+  {
+    "id": "service-review",
+    "tenant_id": "bluewhale-kb",
+    "title": "客服人工审核流程",
+    "file": "data/fixtures/bluewhale-kb/service-review.md",
+    "evidence_type": "service_workflow",
+    "department_id": "customer-service",
+    "visibility": "department",
+    "effective_at": "2026-01-01T00:00:00+08:00",
+    "active": true
+  },
+  {
+    "id": "finance-refund",
+    "tenant_id": "bluewhale-kb",
+    "title": "财务对账与大额退款规则",
+    "file": "data/fixtures/bluewhale-kb/finance-refund.md",
+    "evidence_type": "finance_policy",
+    "department_id": "finance",
+    "visibility": "department",
+    "effective_at": "2026-01-01T00:00:00+08:00",
+    "active": true
+  },
+  {
+    "id": "promotion",
+    "tenant_id": "starlight",
+    "title": "星河零售会员活动",
+    "file": "data/fixtures/starlight/promotion.md",
+    "evidence_type": "promotion_policy",
+    "department_id": "platform",
+    "visibility": "company",
+    "effective_at": "2026-01-01T00:00:00+08:00",
+    "active": true
+  }
+]

@@ -1,22 +1,19 @@
 [project]
 name = "ragops-studio-backend"
-version = "0.1.0"
-description = "Production-oriented RAG portfolio backend with hybrid retrieval, citations, ACL, versioning, evaluation and traces."
+version = "0.2.0"
+description = "Tenant-aware knowledge workflows with versioned sources and inspectable retrieval."
 requires-python = ">=3.11"
-dependencies = [
-  "fastapi==0.116.1",
-  "uvicorn[standard]==0.35.0",
-  "pydantic==2.11.7",
-  "python-multipart==0.0.20",
-  "pypdf==5.9.0",
-  "python-docx==1.2.0",
-  "openai>=1.75,<2",
-  "qdrant-client>=1.14,<2",
-  "langgraph>=0.6,<1",
-]
+dynamic = ["dependencies"]
 
-[tool.ruff]
-line-length = 110
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
 
-[tool.pytest.ini_options]
-pythonpath = ["."]
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.services" = ["schema.sql"]

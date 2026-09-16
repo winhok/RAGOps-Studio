@@ -109,4 +109,3 @@ Use loopback for local operation. Before hosting publicly, configure HTTPS, prot
 - [Architecture and consistency decisions](docs/architecture.md)
 - [Operation and provider setup](docs/OPERATIONS.md)
 - [A short, repeatable walkthrough](docs/walkthrough.md)
-- [Portfolio and resume wording](docs/portfolio-copy.md)

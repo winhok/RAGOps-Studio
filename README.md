@@ -121,12 +121,15 @@ Use `RAGOPS_MODEL_PROVIDER=deepseek`, `DEEPSEEK_API_KEY` and an explicitly selec
 ## Verification
 
 ```bash
-python -m pytest -q
+python -m pip install -r backend/requirements-dev.txt
 npm install --prefix frontend
 npm run typecheck --prefix frontend
 npm run build --prefix frontend
+python -m pytest -q
 python -m compileall -q backend/app
 ```
+
+The backend suite can also be run without a frontend build; in that case the one static-bundle integration assertion is skipped. CI builds the React console first, so the full application job exercises that assertion.
 
 Recorded validation and its limits are documented in [docs/VALIDATION.md](docs/VALIDATION.md). Tests distinguish deterministic local behavior, provider contract tests, and opt-in live integrations. No cloud-model or production-service result is inferred from a local pass.
 

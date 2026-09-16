@@ -1,28 +1,54 @@
 # RAGOps Studio
 
-**Tenant-aware knowledge operations. Answers with a traceable source.**
+**Tenant-aware RAG operations with inspectable retrieval, governed sources, and traceable answers.**
 
-RAGOps Studio connects a bounded evidence-seeking workflow to a versioned knowledge base. It decides when to retrieve, asks for missing user input, searches only authorized sources, and refuses answers that cannot be tied to current source records.
+RAGOps Studio is a production-oriented reference implementation for enterprise knowledge workflows. It combines a React operations console with a FastAPI RAG service that decides when retrieval is required, asks for missing user input, searches only authorized sources, and refuses answers that cannot be grounded in current source records.
 
 ![Knowledge workspace](assets/screenshots/01-workspace.png)
 
-## What is implemented
+## Core capabilities
 
-| Workflow | Behavior |
+| Area | Implementation |
 |---|---|
-| Ask a policy question | Direct / clarify / retrieve routes; additional search only for missing evidence; bounded stopping |
-| Inspect an answer | Server-bound chunk IDs, source text, revision, retrieval scores and execution trace |
-| Manage knowledge | Markdown-aware chunking, SHA-256 change detection, immutable revision files, atomic active-version switch, soft deletion |
-| Enforce scope | Server-issued credentials, tenant isolation, company/department visibility, administrator-only writes |
-| Choose retrieval infrastructure | Local BM25 + vector/RRF pipeline; native Milvus BM25/dense hybrid adapter; preserved Qdrant alternative |
-| Choose model providers | Zhipu embeddings/rerank/chat; DeepSeek chat; preserved OpenAI-compatible alternative |
-| Check regressions | Deterministic behavior/security tests; small document-level evaluation set; explicit external integration tests |
+| Agentic retrieval | Direct / clarify / retrieve routes, bounded follow-up retrieval, explicit stop conditions |
+| Grounded answers | Server-bound chunk IDs, exact source text, source revision and citation validation |
+| Hybrid search | Dense + BM25 retrieval, RRF fusion and optional model reranking |
+| Source governance | Markdown-aware chunking, SHA-256 change detection, immutable revisions, atomic active-version switch and soft deletion |
+| Access control | Server-issued credentials, tenant isolation, company/department visibility and administrator-only writes |
+| Observability | Search rounds, permission filters, candidate scores, stage timings and execution traces |
+| Evaluation | Deterministic regression cases with Recall@K, MRR, nDCG@K and keyword coverage |
+| Integrations | Milvus native hybrid adapter, Zhipu embeddings/rerank/chat, DeepSeek chat, Qdrant and OpenAI-compatible alternatives |
 
-This release consolidates the supplied **08-agentic-rag** and **12-enterprise-knowledge-base** implementations into the existing RAGOps codebase. It is a public engineering project with a **synthetic reference corpus**, not a representation of a customer deployment or a production accuracy benchmark.
+The repository uses a **synthetic reference corpus** so the full workflow can be inspected publicly without exposing customer data. It demonstrates engineering patterns and system behavior; it does not claim customer production metrics or production-model accuracy.
+
+## Architecture
+
+```text
+React 19 + TypeScript + Vite
+            │
+            │ /api
+            ▼
+        FastAPI
+            │
+      Agentic workflow
+    ┌───────┼────────┐
+    │       │        │
+  ACL    Retrieval  Trace
+            │
+   Dense + BM25 → RRF → Rerank
+            │
+     Versioned knowledge store
+            │
+      Local / Milvus / Qdrant
+```
+
+The frontend and API are developed independently, while the production build is deployed as a single application unit: Vite emits `frontend/dist`, and FastAPI serves those static assets alongside the API.
 
 ## Run locally
 
-Python 3.11+ is required; the supplied validation was executed with Python 3.13. The compiled TypeScript web client is included, so Node is not required just to run the application.
+### 1. Backend
+
+Python 3.11+ is required; CI validates with Python 3.13.
 
 ```bash
 python3 -m venv .venv
@@ -34,13 +60,36 @@ python scripts/bootstrap.py --with-sample-data
 python scripts/serve.py
 ```
 
-Open `http://127.0.0.1:8000`. Copy a locally generated credential from `.secrets/access-credentials.txt` into the sign-in form. Start with **agentic-admin** to exercise the multi-source refund scenario. Credentials are random per installation; the server stores only their SHA-256 digests. Do not commit, share or record the plaintext credential file.
+The API is available at `http://127.0.0.1:8000`.
 
-The default profile performs **real ingestion, BM25/vector retrieval, RRF fusion, access checks, revision updates and API calls to the local service**. Its router is rule-based, embeddings use feature hashing, reranking is lexical, and answers are extractive. It does **not** emulate a remote LLM, a learned semantic embedding model or a running Milvus service. The UI explicitly displays the selected runtime.
+### 2. Frontend development
 
-## Select the LangGraph / Milvus / Zhipu profile
+Node 20.19+ is required.
 
-Install optional SDKs, start the supplied local Milvus integration stack, then configure the server:
+```bash
+npm install --prefix frontend
+npm run dev --prefix frontend
+```
+
+Vite runs at `http://127.0.0.1:5173` and proxies `/api` and `/health` to the FastAPI process.
+
+### 3. Production-style local build
+
+```bash
+npm install --prefix frontend
+npm run build --prefix frontend
+python scripts/serve.py
+```
+
+After the Vite build, open `http://127.0.0.1:8000`. FastAPI serves the compiled React application from `frontend/dist`.
+
+Copy a locally generated credential from `.secrets/access-credentials.txt` into the sign-in form. Start with **agentic-admin** to exercise the multi-source refund scenario. Credentials are random per installation; the server stores only SHA-256 digests. Do not commit, share or record the plaintext credential file.
+
+The default profile performs real ingestion, BM25/vector retrieval, RRF fusion, access checks, revision updates and local API calls. Its router is rule-based, embeddings use feature hashing, reranking is lexical, and answers are extractive. It does **not** emulate a remote LLM, a learned semantic embedding model or a running Milvus service. The selected runtime is shown in the UI.
+
+## LangGraph / Milvus / Zhipu profile
+
+Install optional SDKs, start the local Milvus stack, then configure the server:
 
 ```bash
 python -m pip install -r backend/requirements-integrations.txt
@@ -65,47 +114,52 @@ RAGOPS_STATE_DIR=./.state-zhipu
 VECTOR_COLLECTION=ragops_zhipu_v2
 ```
 
-The model names above come from the supplied references; confirm that your own provider account has access. Re-run bootstrap in the new state directory before starting the service. An incompatible embedding/index fingerprint is rejected rather than silently reusing stale vectors. Selecting an unavailable SDK, key or service fails explicitly—there is no hidden fallback.
+Confirm model availability for your provider account before enabling an external profile. Re-run bootstrap in the new state directory before starting the service. An incompatible embedding/index fingerprint is rejected rather than silently reusing stale vectors. Selecting an unavailable SDK, key or service fails explicitly—there is no hidden fallback.
 
-Use `RAGOPS_MODEL_PROVIDER=deepseek`, `DEEPSEEK_API_KEY` and an explicitly selected `CHAT_MODEL` to use the chat provider from reference 08. Embeddings and reranking remain separately configured.
+Use `RAGOPS_MODEL_PROVIDER=deepseek`, `DEEPSEEK_API_KEY` and an explicitly selected `CHAT_MODEL` to use the DeepSeek chat provider. Embeddings and reranking remain separately configured.
 
 ## Verification
 
 ```bash
-python -m pytest -q
-# Rebuild the typed web client after source changes:
+python -m pip install -r backend/requirements-dev.txt
 npm install --prefix frontend
+npm run typecheck --prefix frontend
 npm run build --prefix frontend
+python -m pytest -q
+python -m compileall -q backend/app
 ```
 
-Recorded validation and its limits are in [docs/VALIDATION.md](docs/VALIDATION.md). Tests distinguish offline behavior, HTTP provider contracts, and live external integration. Optional integration tests are skipped without their explicit prerequisites. No cloud-model or production-service result is inferred from a local pass.
+The backend suite can also be run without a frontend build; in that case the one static-bundle integration assertion is skipped. CI builds the React console first, so the full application job exercises that assertion.
+
+Recorded validation and its limits are documented in [docs/VALIDATION.md](docs/VALIDATION.md). Tests distinguish deterministic local behavior, provider contract tests, and opt-in live integrations. No cloud-model or production-service result is inferred from a local pass.
 
 ## Repository map
 
 ```text
 backend/app/
-  api/           request validation and authenticated HTTP routes
-  core/          identities, configuration, chunks and retrieval primitives
-  services/      document store, model/index adapters, graph and evaluation
-frontend/src/    typed web client: ask, sources, traces, evaluations
-frontend/dist/   compiled client served by the same FastAPI process
-scripts/        explicit bootstrap and single-worker startup
-backend/tests/  behavior, authorization, lifecycle and integration checks
-data/           synthetic reference corpus and explicit update input
-infra/          optional local Milvus stack
+  api/             authenticated HTTP routes and request validation
+  core/            identities, configuration, chunks and retrieval primitives
+  services/        document store, model/index adapters, graph and evaluation
+frontend/src/
+  features/        ask, knowledge, trace, evaluation and authentication views
+  api.ts           typed API transport and credential handling
+  types.ts         API/domain contracts
+frontend/dist/     generated Vite production build (not committed)
+scripts/           explicit bootstrap, startup and browser verification
+backend/tests/     behavior, authorization, lifecycle and integration checks
+data/              synthetic reference corpus and update fixtures
+infra/             optional local Milvus stack
 ```
 
-The original React build shell was replaced with a small typed browser client so the portfolio is runnable from one Python process with no frontend runtime service. The backend remains FastAPI; the reference NestJS/Vue applications are not duplicated or advertised as this project's stack.
+## Deployment boundary
 
-## Scope and deployment boundary
+The deployable application is one FastAPI service, one compiled React bundle, a SQLite metadata store and one configured vector backend. The Docker image builds the React bundle in a Node stage and copies only the resulting static assets into the Python runtime image.
 
-The unit of deployment is one application process, a SQLite metadata store and one configured vector backend. There is no message queue, distributed ingestion worker, SSO product, agent marketplace or unrelated tool system. New RAG features in this release are limited to the two supplied references. Existing TXT/text-PDF/DOCX ingestion, Qdrant/OpenAI-compatible adapters and retrieval evaluation were retained, not expanded.
-
-Use loopback for local operation. Before hosting publicly, configure HTTPS, protect provider endpoints and secrets, set reverse-proxy request limits, back up state, and verify live integrations in the actual environment. Do not treat the included local MinIO credentials as production credentials. Multi-instance operation and immediate revocation of already in-flight remote model context are outside this release's guarantees.
+Before hosting publicly, configure HTTPS, provider secrets, reverse-proxy request limits, state backups and live integration verification in the target environment. Multi-instance coordination, enterprise SSO and distributed ingestion workers are outside the current scope.
 
 ## Further reading
 
 - [Source-to-implementation map](docs/REFERENCE-MAP.md)
 - [Architecture and consistency decisions](docs/architecture.md)
-- [Operation and provider setup](docs/OPERATIONS.md)
-- [A short, repeatable walkthrough](docs/walkthrough.md)
+- [Operations and provider setup](docs/OPERATIONS.md)
+- [Repeatable walkthrough](docs/walkthrough.md)

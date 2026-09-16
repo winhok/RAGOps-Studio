@@ -1,4 +1,5 @@
 import json
+import re
 import pytest
 from conftest import auth
 
@@ -108,8 +109,13 @@ def test_response_security_headers(client):
 
 def test_compiled_client_is_served_by_the_same_app(client):
     response = client.get("/")
+    if response.status_code == 404:
+        pytest.skip("frontend production build is not present")
     assert response.status_code == 200
     assert "RAGOps Studio" in response.text
-    assert client.get("/assets/app.js").status_code == 200
-    assert client.get("/assets/styles.css").status_code == 200
+    assets = re.findall(r'(?:src|href)="(/assets/[^"]+\.(?:js|css))"', response.text)
+    assert any(asset.endswith(".js") for asset in assets)
+    assert any(asset.endswith(".css") for asset in assets)
+    for asset in assets:
+        assert client.get(asset).status_code == 200
     assert client.get("/.secrets/access-credentials.txt").status_code == 404

@@ -7,6 +7,7 @@
 - Added a Vite development proxy and a production build that is served by FastAPI from `frontend/dist`.
 - Changed the Docker image to a multi-stage build so frontend dependencies and source files are not shipped in the Python runtime image.
 - Stopped versioning generated frontend build artifacts; CI now builds the console from source.
+- Updated React/Vite dependencies to maintained releases and added a CI gate for high-severity npm advisories.
 
 ## 0.2.0 — Reference integration
 

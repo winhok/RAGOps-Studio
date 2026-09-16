@@ -2,7 +2,7 @@
 
 ## Local startup
 
-Use the README commands from the repository root. The browser, API and static assets share port 8000. The packaged `frontend/dist` is a real compiled client, not an HTML screenshot. Startup never silently seeds a database. Run bootstrap explicitly when the reference corpus is desired.
+Use the README commands from the repository root. In development, Vite serves the React console on port 5173 and proxies API calls to FastAPI on port 8000. For a production-style local run, build `frontend/dist` first; FastAPI then serves the compiled console and API from port 8000. Startup never silently seeds a database. Run bootstrap explicitly when the reference corpus is desired.
 
 The credentials file holds five operator-generated accounts:
 
@@ -20,18 +20,29 @@ The credentials file holds five operator-generated accounts:
 
 Do not reuse vectors from a different model or dimensionality. Set a new `RAGOPS_STATE_DIR` **and** `VECTOR_COLLECTION`, then ingest the intended source files again. The state fingerprint rejects incompatible switches. A local restore requires the SQLite database and immutable source directory together. External indexes are additional state and must remain consistent or be rebuilt.
 
-## Running the web client build
+## Running the React console
+
+Development mode:
 
 ```bash
 npm install --prefix frontend
-npm run build --prefix frontend
+npm run dev --prefix frontend
 ```
 
-TypeScript is pinned to 5.8.3. `tsc` enforces strict checking with no emit on errors. The browser has no external CDN or font dependency. Python/FastAPI serves the resulting ES modules and CSS. For a split dev server, explicitly allow its origin using `CORS_ORIGINS`; CORS is not authentication.
+Production build:
+
+```bash
+npm install --prefix frontend
+npm run typecheck --prefix frontend
+npm run build --prefix frontend
+python scripts/serve.py
+```
+
+The frontend uses React 19, TypeScript 5.8 and Vite. TypeScript strict mode is enabled. The browser has no external CDN or font dependency. In the production topology, FastAPI serves the generated assets in `frontend/dist`; generated build output is intentionally not versioned. The Vite development server proxies `/api` and `/health` to the local backend. CORS configuration is not a substitute for authentication.
 
 ## Container commands
 
-The Docker recipes are supplied but were not executed in the authoring environment.
+The Dockerfile uses a Node build stage for the React console and copies only `frontend/dist` into the final non-root Python image.
 
 ```bash
 docker compose build
@@ -43,7 +54,7 @@ docker compose logs -f app
 
 The plaintext credential command is for the local operator only. Named volumes retain application state and identities. The port is bound to loopback. The image runs one non-root worker; do not increase worker/replica counts without redesigning the publication lock and state coordination.
 
-The optional `infra/milvus.compose.yml` is the source reference's local standalone stack with loopback port bindings. It retains local MinIO defaults for reproducibility. Do not publish these ports, reuse these credentials in a hosted service, or claim that the compose recipe has been production-validated.
+The optional `infra/milvus.compose.yml` is the local standalone integration stack with loopback port bindings. It retains local MinIO defaults for reproducibility. Do not publish these ports or reuse those credentials in a hosted service.
 
 ## Diagnostic approach
 

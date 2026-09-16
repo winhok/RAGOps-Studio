@@ -8,6 +8,7 @@ volumes/
 *.sqlite3*
 *.db
 *.log
+
 # Python
 .venv/
 __pycache__/
@@ -15,7 +16,10 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+
 # Frontend
 node_modules/
-# frontend/dist is intentionally versioned so local startup needs no Node build.
+frontend/node_modules/
+frontend/dist/
+
 .DS_Store

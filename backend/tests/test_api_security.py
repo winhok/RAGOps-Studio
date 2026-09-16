@@ -30,58 +30,63 @@ def test_config_does_not_expose_secrets(client):
     ("post", "/api/evaluate", {"k": 5}),
     ("get", "/api/documents/company-refund/versions", None),
 ])
-def test_missing_credentials_on_protected_routes(client, verb, path, body):
-    response = getattr(client, verb)(path, json=body) if body is not None else getattr(client, verb)(path)
-    assert response.status_code == 401
+def test_employee_cannot_maintain_or_audit_admin_data(client, verb, path, body):
+    kwargs = {"headers": auth("support")}
+    if body is not None:
+        kwargs["json"] = body
+    assert getattr(client, verb)(path, **kwargs).status_code == 403
 
 
-def test_employee_cannot_write_documents(client):
-    response = client.post("/api/documents", headers=auth("support"), json={"title": "nope", "content": "nope"})
-    assert response.status_code == 403
+def test_private_sources_hidden_across_department_and_tenant(client):
+    path = "/api/documents/finance-refund/versions/1/source"
+    assert client.get(path, headers=auth("support")).status_code == 404
+    assert client.get(path, headers=auth("finance")).status_code == 200
+    assert client.get(path, headers=auth("other")).status_code == 404
+    visible = client.get("/api/documents", headers=auth("support")).json()
+    assert {d["id"] for d in visible} == {"company-refund", "service-review"}
 
 
-def test_department_and_tenant_scope(client):
-    support = client.get("/api/documents", headers=auth("support"))
-    assert support.status_code == 200
-    titles = {row["title"] for row in support.json()}
-    assert "客服退款操作手册" in titles
-    assert "财务退款对账要求" not in titles
-    assert "星光商城促销规则" not in titles
-
-    finance = client.get("/api/documents", headers=auth("finance"))
-    assert finance.status_code == 200
-    titles = {row["title"] for row in finance.json()}
-    assert "财务退款对账要求" in titles
-    assert "客服退款审核流程" not in titles
-
-
-def test_hidden_source_returns_not_found(client):
-    response = client.get("/api/documents/finance-refund/versions/1/source", headers=auth("support"))
-    assert response.status_code == 404
+def test_trace_is_private_and_revalidates_revoked_sources(client):
+    result = client.post("/api/chat", headers=auth("support"), json={"query": "退款人工审核阈值是多少？"}).json()
+    assert result["outcome"] == "answered"
+    path = "/api/traces/" + result["trace_id"]
+    assert client.get(path, headers=auth("finance")).status_code == 404
+    assert client.get(path, headers=auth("other")).status_code == 404
+    assert client.get(path, headers=auth("admin")).status_code == 200
+    source = client.get("/api/documents/company-refund/versions/1/source", headers=auth("admin")).json()
+    replacement = {k: source[k] for k in ("title", "content", "evidence_type", "effective_at")}
+    replacement.update(department_id="finance", visibility="department", expected_version=1)
+    assert client.put("/api/documents/company-refund", headers=auth("admin"), json=replacement).status_code == 200
+    old_trace = client.get(path, headers=auth("support")).json()
+    assert not old_trace["citations"]
+    assert all(not s["candidates"] for s in old_trace["searches"])
+    assert "3000" not in old_trace["answer"]
 
 
-def test_trace_scope_follows_owner(client):
-    chat = client.post("/api/chat", headers=auth("support"), json={"query": "退款金额超过多少元需要人工审核？"})
-    assert chat.status_code == 200
-    trace_id = chat.json()["trace_id"]
-    assert client.get(f"/api/traces/{trace_id}", headers=auth("support")).status_code == 200
-    assert client.get(f"/api/traces/{trace_id}", headers=auth("finance")).status_code == 404
+def test_markdown_upload_and_source_binding(client):
+    response = client.post("/api/documents/upload", headers=auth(),
+        data={"title": "新政策", "evidence_type": "general"},
+        files={"file": ("policy.md", "# 新政策\n\n实际上传的正文。".encode(), "text/markdown")})
+    assert response.status_code == 200, response.text
+    document = response.json()["document"]
+    source = client.get(f'/api/documents/{document["id"]}/versions/1/source', headers=auth()).json()
+    assert "实际上传的正文" in source["content"]
 
 
-def test_stale_document_update_returns_conflict(client):
-    current = client.get("/api/documents/company-refund/versions/1/source", headers=auth()).json()
-    payload = {
-        "title": current["title"], "content": current["content"], "department_id": current["department_id"],
-        "visibility": current["visibility"], "evidence_type": current["evidence_type"],
-        "additional_evidence_types": current["additional_evidence_types"], "effective_at": current["effective_at"],
-        "expires_at": current["expires_at"], "expected_version": 0,
-    }
-    response = client.put("/api/documents/company-refund", headers=auth(), json=payload)
-    assert response.status_code == 409
+def test_unsupported_spreadsheet_upload_rejected(client):
+    response = client.post("/api/documents/upload", headers=auth(), data={"title": "Sheet"},
+        files={"file": ("sheet.xlsx", b"not a spreadsheet", "application/octet-stream")})
+    assert response.status_code == 400
 
 
-def test_evaluation_requires_admin(client):
-    assert client.post("/api/evaluate", headers=auth("support"), json={"k": 5}).status_code == 403
+def test_bad_dates_and_optimistic_version_validation(client):
+    response = client.post("/api/documents", headers=auth(), json={"title": "Rules", "content": "Valid text", "effective_at": "2026-01-01"})
+    assert response.status_code == 422
+    response = client.put("/api/documents/refund-review", headers=auth(), json={"title": "Rules", "content": "Valid text"})
+    assert response.status_code == 400
+
+
+def test_bundled_regression_is_a_measured_run(client):
     result = client.post("/api/evaluate", headers=auth(), json={"k": 5})
     assert result.status_code == 200, result.text
     data = result.json()

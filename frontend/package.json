@@ -1,5 +1,26 @@
 {
-  "name": "ragops-studio-web", "version": "0.2.0", "private": true, "type": "module",
-  "scripts": {"build": "node scripts/build.mjs", "typecheck": "tsc --noEmit"},
-  "devDependencies": {"typescript": "5.8.3"}, "engines": {"node": ">=20"}
+  "name": "ragops-studio-web",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@vitejs/plugin-react": "5.0.2",
+    "typescript": "5.8.3",
+    "vite": "7.1.7"
+  }
 }

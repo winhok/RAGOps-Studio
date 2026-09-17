@@ -262,7 +262,7 @@ export default function App() {
               session={session}
               documents={documents}
               busy={busy}
-              onNew={() => { setError(''); setNotice(''); setModal({ kind: 'edit', document: null }); }}
+              onNew={() => { if (busy) return; setError(''); setNotice(''); setModal({ kind: 'edit', document: null }); }}
               onRefresh={() => runTask(loadDocuments)}
               onOpenSource={openSource}
               onEdit={openEdit}

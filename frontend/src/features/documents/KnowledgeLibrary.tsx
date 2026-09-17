@@ -30,7 +30,7 @@ export function KnowledgeLibrary({ session, documents, busy, onNew, onRefresh, o
           <h1>Knowledge library</h1>
           <p>One active revision. Clear ownership. Retrievable evidence.</p>
         </div>
-        {isAdmin ? <button className="button primary" data-action="new-document" onClick={onNew}>＋ Add document</button> : <Pill>Read-only access</Pill>}
+        {isAdmin ? <button className="button primary" data-action="new-document" onClick={onNew} disabled={busy}>＋ Add document</button> : <Pill>Read-only access</Pill>}
       </div>
       <div className="panel">
         <div className="panel-heading">

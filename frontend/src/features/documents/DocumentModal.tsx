@@ -71,7 +71,7 @@ export function DocumentModal({ modal, session, busy, error, notice, onClose, on
 
   let content;
   if (modal.kind === 'edit') {
-    content = <EditForm document={modal.document} session={session} busy={busy} onClose={onClose} onPublish={onPublish} />;
+    content = <EditForm key={modal.document ? `${modal.document.id}:${modal.document.version}` : 'new'} document={modal.document} session={session} busy={busy} onClose={onClose} onPublish={onPublish} />;
   } else if (modal.kind === 'history') {
     content = (
       <>

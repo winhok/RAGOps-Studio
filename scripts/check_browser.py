@@ -195,6 +195,33 @@ with sync_playwright() as p:
     page.wait_for_selector('#query-form')
     page.locator('[data-nav="documents"]').first.click()
     assert page.locator('tbody tr').count() == 3
+    # Hold the source response to exercise the edit/new-document race without sleeps.
+    page.evaluate("""() => {
+      const originalFetch = window.fetch;
+      window.fetch = async (...args) => {
+        const response = await originalFetch(...args);
+        if (String(args[0]).includes('/versions/') && String(args[0]).endsWith('/source')) {
+          await new Promise(resolve => { window.releaseEditResponse = resolve; });
+          window.fetch = originalFetch;
+        }
+        return response;
+      };
+    }""")
+    page.locator('[data-edit="company-refund"]').click()
+    page.wait_for_function("typeof window.releaseEditResponse === 'function'")
+    assert page.locator('[data-action="new-document"]').is_disabled()
+    page.locator('[data-action="new-document"]').evaluate('(button) => button.click()')
+    assert page.locator('#document-form').count() == 0
+    page.evaluate('window.releaseEditResponse()')
+    page.wait_for_selector('#document-form')
+    assert page.locator('input[name="id"]').input_value() == 'company-refund'
+    page.locator('.modal-close').click()
+    page.locator('[data-action="new-document"]').click()
+    assert page.locator('input[name="id"]').input_value() == ''
+    assert page.locator('input[name="title"]').input_value() == ''
+    assert page.locator('textarea[name="content"]').input_value() == ''
+    page.locator('.modal-close').click()
+    checks.append('Pending edit blocks new-document action; a later new form has no existing document target')
     page.locator('[data-edit="company-refund"]').click()
     page.wait_for_selector('#document-form')
     page.screenshot(path=str(screens / '05-document-editor.png'), full_page=True)

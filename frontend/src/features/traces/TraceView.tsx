@@ -48,9 +48,16 @@ export function TraceView({ trace, busy, onLoadTrace }: Props) {
               </div>
               <div className="filter-line"><span>SERVER FILTER</span><code>{round.permission_filter}</code></div>
               <div className="round-query">{round.query}</div>
+              {round.assessment ? (
+                <p className="round-assessment">
+                  <Pill type={round.assessment.status === 'supporting' ? 'green' : 'amber'}>{label(round.assessment.status)}</Pill>
+                  <span>{round.assessment.accepted_ids.length} supporting · {round.assessment.rejected_count} excluded</span>
+                  <small>{round.assessment.method === 'lexical' ? 'Local lexical check' : 'Model relevance check'}</small>
+                </p>
+              ) : null}
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Candidate</th><th>Dense</th><th>BM25</th><th>RRF</th><th>Rerank</th></tr></thead>
+                  <thead><tr><th>Candidate</th><th>Dense</th><th>BM25</th><th>RRF</th><th>Rerank</th><th>Evidence</th></tr></thead>
                   <tbody>
                     {round.candidates.length ? round.candidates.map((candidate) => (
                       <tr key={candidate.chunk_id}>
@@ -59,8 +66,9 @@ export function TraceView({ trace, busy, onLoadTrace }: Props) {
                         <td>{score(candidate.lexical_score)}</td>
                         <td>{score(candidate.rrf_score)}</td>
                         <td><strong>{score(candidate.rerank_score)}</strong></td>
+                        <td>{round.assessment ? (round.assessment.accepted_ids.includes(candidate.chunk_id) ? 'Supporting' : 'Excluded') : '—'}</td>
                       </tr>
-                    )) : <tr><td colSpan={5} className="empty-cell">No candidates in this authorized scope.</td></tr>}
+                    )) : <tr><td colSpan={6} className="empty-cell">No candidates in this authorized scope.</td></tr>}
                   </tbody>
                 </table>
               </div>

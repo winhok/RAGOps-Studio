@@ -44,6 +44,14 @@ class GroundedAnswer(BaseModel):
     answer: str = Field(min_length=1, max_length=12000)
     source_ids: list[str] = Field(default_factory=list, max_length=32)
 
+class EvidenceAssessment(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    relevant_ids: list[str] = Field(max_length=32)
+
+class SearchRevision(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    query: str = Field(max_length=2000)
+
 @dataclass(slots=True)
 class Document:
     id: str

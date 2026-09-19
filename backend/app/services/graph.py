@@ -1,12 +1,13 @@
 from __future__ import annotations
 import time
+import re
 from dataclasses import asdict
 from datetime import datetime
 from typing import TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 from app.core.auth import can_read
-from app.core.errors import ConfigurationError
-from app.core.models import Decision, EvidenceType, GroundedAnswer, Principal, utcnow
+from app.core.errors import ConfigurationError, ProviderError
+from app.core.models import Decision, EvidenceAssessment, SearchRevision, EvidenceType, GroundedAnswer, Principal, utcnow
 from app.services.retrieval import hit_record
 from app.services.store import valid_dates
 from app.services.vector_index import permission_filter
@@ -49,6 +50,10 @@ class GraphState(TypedDict, total=False):
     rejected: list[dict]
     missing_evidence: list[str]
     searched_types: list[str]
+    revised_types: list[str]
+    revised_queries: dict[str, str]
+    assessed_ids: list[str]
+    relevant_ids: list[str]
     search_attempts: int
     events: list[dict]
     searches: list[dict]
@@ -59,7 +64,7 @@ class GraphState(TypedDict, total=False):
     stop_reason: str
 
 def initial_state(query: str) -> GraphState:
-    return dict(query=query, route='', required_evidence=[], clarification_question=None, candidates=[], usable=[], rejected=[], missing_evidence=[], searched_types=[], search_attempts=0, events=[], searches=[], timings_ms={}, text='', citations=[], outcome='', stop_reason='')
+    return dict(query=query, route='', required_evidence=[], clarification_question=None, candidates=[], usable=[], rejected=[], missing_evidence=[], searched_types=[], revised_types=[], revised_queries={}, assessed_ids=[], relevant_ids=[], search_attempts=0, events=[], searches=[], timings_ms={}, text='', citations=[], outcome='', stop_reason='')
 
 class WorkflowNodes:
 
@@ -86,7 +91,7 @@ class WorkflowNodes:
 
     def search_knowledge(self, state):
         evidence_type = state['missing_evidence'][0]
-        query = (QUERY_HINTS[evidence_type] + '。 ' + state['query']).strip()
+        query = state['revised_queries'].get(evidence_type) or ((QUERY_HINTS[evidence_type] + '。 ') if QUERY_HINTS[evidence_type] else '') + state['query']
         hits, timing, scope_count = self.tool.invoke({'query': query, 'evidence_type': evidence_type})
         by_id = {h.chunk.id: h for h in state['candidates']}
         for hit in hits:
@@ -100,8 +105,10 @@ class WorkflowNodes:
         return {'search_attempts': state['search_attempts'] + 1, 'searched_types': [*state['searched_types'], evidence_type], 'candidates': list(by_id.values()), 'searches': [*state['searches'], record], 'events': self.event(state, 'search_knowledge', f'Retrieved {len(visible)} candidates for {evidence_type}', evidence_type=evidence_type)}
 
     def assess_evidence(self, state):
+        started = time.perf_counter()
         usable, rejected = ([], [])
         now = self.now()
+        current_ids = self.store.current_ids(self.principal)
         for hit in state['candidates']:
             c = hit.chunk
             if not can_read(self.principal, c.tenant_id, c.department_id, c.visibility):
@@ -113,13 +120,34 @@ class WorkflowNodes:
                 reason = 'not_yet_effective_or_expired'
             elif not c.evidence_types().intersection(state['required_evidence']) and 'general' not in state['required_evidence']:
                 reason = 'unrequested_evidence_type'
+            elif c.id not in current_ids:
+                reason = 'source_changed_before_assessment'
             if reason:
                 rejected.append({'chunk_id': c.id, 'reason': reason})
             else:
                 usable.append(hit)
+        assessed_ids = set(state['assessed_ids'])
+        relevant_ids = set(state['relevant_ids'])
+        fresh = [h.chunk for h in usable if h.chunk.id not in assessed_ids]
+        if fresh:
+            assessment = EvidenceAssessment.model_validate(self.models.assess(state['query'], fresh))
+            if not set(assessment.relevant_ids) <= {c.id for c in fresh}:
+                raise ProviderError('Evidence assessment returned an unknown source ID')
+            assessed_ids.update(c.id for c in fresh)
+            relevant_ids.update(assessment.relevant_ids)
+        rejected.extend({'chunk_id': h.chunk.id, 'reason': 'not_relevant_to_question'} for h in usable if h.chunk.id not in relevant_ids)
+        usable = [h for h in usable if h.chunk.id in relevant_ids]
         available = {kind for h in usable for kind in h.chunk.evidence_types()}
         missing = [kind for kind in state['required_evidence'] if kind not in available and (not (kind == 'general' and usable))]
-        return {'usable': usable, 'rejected': rejected, 'missing_evidence': missing, 'events': self.event(state, 'assess_evidence', 'Missing: ' + ', '.join(missing) if missing else 'All required evidence types are present', missing=missing, rejected_count=len(rejected))}
+        elapsed = round((time.perf_counter() - started) * 1000, 2)
+        searches = [dict(s) for s in state['searches']]
+        round_ids = {c['chunk_id'] for c in searches[-1]['candidates']}
+        accepted = sorted(round_ids & {h.chunk.id for h in usable})
+        # Persist server-written summaries, never model prose that could retain revoked source text.
+        searches[-1]['assessment'] = {'accepted_ids': accepted, 'rejected_count': len(round_ids) - len(accepted), 'method': self.models.assessment_method, 'status': 'supporting' if accepted else 'insufficient'}
+        searches[-1]['timings_ms'] = {**searches[-1]['timings_ms'], 'assessment': elapsed}
+        message = ('Missing: ' + ', '.join(missing) if missing else 'All required evidence types have supporting chunks') + f'; {len(accepted)} supporting candidates in this round'
+        return {'usable': usable, 'rejected': rejected, 'assessed_ids': sorted(assessed_ids), 'relevant_ids': sorted(relevant_ids), 'searches': searches, 'missing_evidence': missing, 'timings_ms': {**state['timings_ms'], 'assessment': round(state['timings_ms'].get('assessment', 0) + elapsed, 2)}, 'events': self.event(state, 'assess_evidence', message, missing=missing, rejected_count=len(rejected))}
 
     def after_assessment(self, state):
         if not state['missing_evidence']:
@@ -127,8 +155,28 @@ class WorkflowNodes:
         if state['search_attempts'] >= self.max_searches:
             return 'refuse_answer'
         if state['missing_evidence'][0] in state['searched_types']:
+            evidence_type = state['missing_evidence'][0]
+            previous = next(s for s in reversed(state['searches']) if s['evidence_type'] == evidence_type)
+            if not state['revised_types'] and previous['scope_count'] > 0:
+                return 'revise_search'
             return 'refuse_answer'
         return 'search_knowledge'
+
+    def revise_search(self, state):
+        started = time.perf_counter()
+        evidence_type = state['missing_evidence'][0]
+        previous = next(s['query'] for s in reversed(state['searches']) if s['evidence_type'] == evidence_type)
+        revision = SearchRevision.model_validate(self.models.revise_search(state['query'], previous))
+        query = revision.query
+        signature = lambda value: re.sub(r'[\W_]+', '', value.casefold())
+        tried = {signature(s['query']) for s in state['searches'] if s['evidence_type'] == evidence_type}
+        changed = bool(signature(query)) and signature(query) not in tried
+        queries = {**state['revised_queries'], evidence_type: query if changed else ''}
+        return {'revised_types': [*state['revised_types'], evidence_type], 'revised_queries': queries, 'timings_ms': {**state['timings_ms'], 'query_revision': round(state['timings_ms'].get('query_revision', 0) + (time.perf_counter() - started) * 1000, 2)}, 'events': self.event(state, 'revise_search', 'Trying one alternative query for missing supporting evidence' if changed else 'Stopped: no distinct alternative query', evidence_type=evidence_type, previous_query=previous, query=query if changed else '')}
+
+    @staticmethod
+    def after_revision(state):
+        return 'search_knowledge' if state['revised_queries'].get(state['missing_evidence'][0]) else 'refuse_answer'
 
     def generate_answer(self, state):
         started = time.perf_counter()
@@ -178,7 +226,7 @@ class PythonWorkflow:
 
     def invoke(self, state: GraphState):
         current = 'decide_request'
-        for _ in range(2 * self.nodes.max_searches + 5):
+        for _ in range(3 * self.nodes.max_searches + 5):
             state = {**state, **self.nodes.run_node(current, state)}
             if current == 'decide_request':
                 current = self.nodes.after_decision(state)
@@ -186,6 +234,8 @@ class PythonWorkflow:
                 current = 'assess_evidence'
             elif current == 'assess_evidence':
                 current = self.nodes.after_assessment(state)
+            elif current == 'revise_search':
+                current = self.nodes.after_revision(state)
             else:
                 return state
         raise RuntimeError('Workflow exceeded its bounded node budget')
@@ -200,12 +250,13 @@ def build_rag_graph(nodes: WorkflowNodes, engine: str):
     except ImportError as exc:
         raise ConfigurationError('LangGraph is selected but not installed. Install requirements-integrations.txt; no fallback was used.') from exc
     graph = StateGraph(GraphState)
-    for name in ('decide_request', 'search_knowledge', 'assess_evidence', 'generate_answer', 'direct_answer', 'clarify_user', 'refuse_answer'):
+    for name in ('decide_request', 'search_knowledge', 'assess_evidence', 'revise_search', 'generate_answer', 'direct_answer', 'clarify_user', 'refuse_answer'):
         graph.add_node(name, lambda state, name=name: nodes.run_node(name, state))
     graph.add_edge(START, 'decide_request')
     graph.add_conditional_edges('decide_request', nodes.after_decision, {'direct_answer': 'direct_answer', 'clarify_user': 'clarify_user', 'search_knowledge': 'search_knowledge'})
     graph.add_edge('search_knowledge', 'assess_evidence')
-    graph.add_conditional_edges('assess_evidence', nodes.after_assessment, {'generate_answer': 'generate_answer', 'refuse_answer': 'refuse_answer', 'search_knowledge': 'search_knowledge'})
+    graph.add_conditional_edges('assess_evidence', nodes.after_assessment, {name: name for name in ('generate_answer', 'refuse_answer', 'search_knowledge', 'revise_search')})
+    graph.add_conditional_edges('revise_search', nodes.after_revision, {name: name for name in ('search_knowledge', 'refuse_answer')})
     for name in ('generate_answer', 'direct_answer', 'clarify_user', 'refuse_answer'):
         graph.add_edge(name, END)
-    return graph.compile()
+    return graph.compile().with_config({'recursion_limit': 3 * nodes.max_searches + 5})

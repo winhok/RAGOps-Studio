@@ -691,6 +691,10 @@ label input,label textarea,label select {
   color:#8d9e83;
   margin-top:5px
 }
+.timeline-step>div {
+  min-width:0;
+  overflow-wrap:anywhere;
+}
 .step-dot {
   height:5px;
   width:5px;
@@ -840,6 +844,21 @@ td strong {
   padding:15px 22px;
   font-size:11px;
   color:#8ca174
+}
+.round-assessment {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+  margin:0;
+  padding:0 22px 14px;
+  font-size:12px;
+}
+.round-assessment small {
+  color:#45603e;
+}
+.round-assessment .pill {
+  color:#264e36;
 }
 .stage-timings {
   display:flex;

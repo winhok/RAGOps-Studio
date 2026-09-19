@@ -14,6 +14,8 @@ export function Timeline({ trace }: { trace: Trace }) {
           <div>
             <strong>{label(event.node)}</strong>
             <p>{event.message}</p>
+            {event.previous_query ? <p>Previous: {event.previous_query}</p> : null}
+            {event.query ? <p>Revised: {event.query}</p> : null}
           </div>
           <span className="step-dot" />
         </div>

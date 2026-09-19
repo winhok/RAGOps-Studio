@@ -134,3 +134,43 @@ def test_rerank_request_uses_only_authorized_candidates(settings, populated):
         assert "STAR-88" not in str(bodies)
     finally:
         t.close()
+
+
+def test_chat_assessment_and_revision_use_separate_structured_requests(settings, runtime, admin, publish):
+    publish()
+    chunks = runtime.store.snapshot(admin)
+    settings = settings.model_copy(update={'model_provider': 'deepseek', 'deepseek_api_key': 'fixture', 'chat_model': 'fixture'})
+    requests = []
+    def handler(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        result = {'relevant_ids': [chunks[0].id]} if len(requests) == 1 else {'query': 'refund manual review threshold'}
+        return httpx.Response(200, json={'choices': [{'message': {'content': json.dumps(result)}}]})
+    t = transport(handler)
+    try:
+        models = ChatModels(settings, t)
+        assert models.assess('Refund threshold?', chunks).relevant_ids == [chunks[0].id]
+        assert models.revise_search('Refund threshold?', 'refund').query == 'refund manual review threshold'
+        assert all(body['stream'] is False for body in requests)
+        assessment = json.loads(requests[0]['messages'][1]['content'])
+        assert assessment['evidence'][0]['id'] == chunks[0].id
+        assert json.loads(requests[1]['messages'][1]['content']) == {'question': 'Refund threshold?', 'previous_query': 'refund'}
+    finally:
+        t.close()
+
+
+@pytest.mark.parametrize('method,result', [
+    ('assess', {'relevant_ids': 'wrong-shape'}),
+    ('assess', {'relevant_ids': [], 'answer': 'unexpected'}),
+    ('revise_search', {'query': 'x' * 2001}),
+    ('revise_search', {'query': 'refund', 'tenant_id': 'other'}),
+])
+def test_invalid_assessment_and_revision_responses_fail_closed(settings, method, result):
+    settings = settings.model_copy(update={'model_provider': 'deepseek', 'deepseek_api_key': 'fixture', 'chat_model': 'fixture'})
+    t = transport(lambda _: httpx.Response(200, json={'choices': [{'message': {'content': json.dumps(result)}}]}))
+    try:
+        models = ChatModels(settings, t)
+        with pytest.raises(ProviderError):
+            getattr(models, method)('Refund threshold?', [] if method == 'assess' else 'refund')
+    finally:
+        t.close()

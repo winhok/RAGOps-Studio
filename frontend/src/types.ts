@@ -86,6 +86,12 @@ export interface SearchRound {
     permission_filter: string;
     timings_ms: Record<string, number>;
     candidates: Candidate[];
+    assessment?: {
+        accepted_ids: string[];
+        rejected_count: number;
+        method: 'lexical' | 'model';
+        status: 'supporting' | 'insufficient';
+    };
 }
 export interface Trace {
     trace_id: string;
@@ -100,6 +106,8 @@ export interface Trace {
         node: string;
         message: string;
         missing?: string[];
+        previous_query?: string;
+        query?: string;
     }[];
     searches: SearchRound[];
     rejected: {

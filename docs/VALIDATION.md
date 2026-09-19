@@ -1,5 +1,27 @@
 # Validation record
 
+## Local structured-source validation — 2026-09-29
+
+| Check | Result |
+|---|---|
+| Backend regression suite | **98 passed, 4 skipped** on the existing Python 3.14 environment |
+| Optional LangGraph checks | **2 passed** with LangGraph 0.6.11 and LangChain Core 0.3.86 installed in an isolated temporary directory |
+| TypeScript and Vite production build | Passed |
+| Python compilation | Passed for the backend and demonstration/browser scripts |
+| Browser workflow | **18 checks passed**, Chromium direct HTTP navigation to an isolated local FastAPI process; no browser errors |
+| Word upload | Generated synthetic DOCX uploaded through the UI, table value retrieved, exact stored source revision opened |
+| Trace inspection | Per-round assessments inspected on desktop and at 390 px; no document-width overflow |
+
+The four default-suite skips are two optional SDK checks and two live-service gates. Both SDK checks were run separately and passed. Milvus and live Zhipu remain unverified. Assessment/revision provider contracts use controlled HTTP responses and do not measure semantic model accuracy. The browser run explicitly used the local profile and made no remote-model calls.
+
+The existing collapsed mobile sidebar still shows some labels outside its narrow column. The new assessment block fits the viewport, but this run is not a claim of complete mobile visual polish. No production server was updated, and no fresh GitHub Actions result is claimed.
+
+Browser artifacts can be written separately from published screenshots:
+
+```bash
+CHROMIUM_PATH=/path/to/chromium python scripts/check_browser.py --output-dir /tmp/ragops-verification
+```
+
 ## Current GitHub Actions validation
 
 The React/Vite refactor is verified from source on GitHub Actions rather than relying on committed build artifacts.

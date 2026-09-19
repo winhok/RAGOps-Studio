@@ -21,10 +21,12 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--transport-bridge', action='store_true')
+parser.add_argument('--output-dir', type=Path, help='Write verification artifacts outside the published screenshot set')
 args = parser.parse_args()
-screens = ROOT / 'assets/screenshots'
+screens = args.output_dir / 'screenshots' if args.output_dir else ROOT / 'assets/screenshots'
 screens.mkdir(parents=True, exist_ok=True)
-(ROOT / 'evidence').mkdir(exist_ok=True)
+evidence_dir = args.output_dir if args.output_dir else ROOT / 'evidence'
+evidence_dir.mkdir(parents=True, exist_ok=True)
 temporary = tempfile.TemporaryDirectory(prefix='ragops-browser-')
 work = Path(temporary.name)
 with socket.socket() as available:
@@ -154,8 +156,11 @@ with sync_playwright() as p:
     page.locator('[data-nav="trace"]').first.click()
     page.wait_for_selector('.round')
     assert page.locator('.round').count() == 2
+    assert page.locator('.round-assessment').count() == 2
+    assert 'Local lexical check' in page.locator('.round-assessment').first.inner_text()
     page.screenshot(path=str(screens / '02-trace.png'), full_page=True)
     checks.append('Trace displays two actual retrieval rounds and scores')
+    checks.append('Trace displays per-round supporting evidence and the local assessment method')
 
     page.locator('[data-nav="ask"]').first.click()
     page.locator('[data-question="1"]').click()
@@ -260,10 +265,42 @@ with sync_playwright() as p:
     assert '原支付渠道' in page.locator('.answer-text').inner_text()
     checks.append('Tenant administrator can answer the same restricted finance question')
 
+    if not args.transport_bridge:
+        from create_demo_document import create_document
+        upload = work / 'document-demo.docx'
+        create_document(upload)
+        page.locator('[data-nav="documents"]').first.click()
+        page.locator('[data-action="new-document"]').click()
+        page.locator('input[name="title"]').fill('Document retention standard')
+        page.locator('select[name="evidence_type"]').select_option('general')
+        page.locator('input[name="file"]').set_input_files(str(upload))
+        page.locator('#document-form button[type="submit"]').click()
+        page.wait_for_selector('#document-form', state='hidden')
+        page.locator('[data-nav="ask"]').first.click()
+        page.fill('#query', 'What is the retention period for demonstration uploads?')
+        page.locator('#query-form button').click()
+        page.wait_for_selector('.answer-panel .pill:text-is("answered")')
+        assert '30 days' in page.locator('.answer-text').inner_text()
+        table_source = page.locator('.source-card').filter(has_text='30 days').first
+        assert table_source.count() == 1
+        table_source.click()
+        page.wait_for_selector('.source-content')
+        source_text = page.locator('.source-content').inner_text()
+        assert '## Retention periods' in source_text and '| Demonstration uploads | 30 days |' in source_text
+        checks.append('Word upload preserves headings and a table value is returned through an exact source citation')
+        page.screenshot(path=str(screens / '07-word-source.png'), full_page=True)
+        page.locator('.modal-close').click()
+
     page.set_viewport_size({'width': 390, 'height': 844})
     page.screenshot(path=str(screens / '06-mobile.png'), full_page=True)
     overflow = page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
     checks.append('Mobile document width fits viewport' if not overflow else 'MOBILE_OVERFLOW')
+    page.locator('[data-nav="trace"]').first.click()
+    page.wait_for_selector('.round-assessment')
+    assert 'Local lexical check' in page.locator('.round-assessment').first.inner_text()
+    trace_overflow = page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
+    checks.append('Mobile trace assessments fit viewport' if not trace_overflow else 'MOBILE_TRACE_OVERFLOW')
+    page.screenshot(path=str(screens / '08-mobile-trace.png'), full_page=True)
     browser.close()
 
 report = {
@@ -272,7 +309,8 @@ report = {
     'browser': 'Chromium with local HTTP transport bridge' if args.transport_bridge else 'Chromium direct HTTP navigation',
     'remote_llm_used': False,
 }
-(ROOT / 'evidence/browser-checks.json').write_text(json.dumps(report, ensure_ascii=False, indent=2))
+(evidence_dir / 'browser-checks.json').write_text(json.dumps(report, ensure_ascii=False, indent=2))
 print(json.dumps(report, ensure_ascii=False, indent=2))
 assert not errors
 assert not overflow
+assert not trace_overflow

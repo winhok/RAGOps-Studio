@@ -57,7 +57,7 @@ def seed(runtime, root: Path=ROOT) -> int:
 def main():
     from app.core.config import Settings
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--with-sample-data', action='store_true', help='Ingest the supplied synthetic demonstration corpus')
+    parser.add_argument('--with-sample-data', action='store_true', help='Ingest the synthetic demonstration corpus')
     args = parser.parse_args()
     settings = Settings.from_env(ROOT)
     create_credentials(settings.principals_file)

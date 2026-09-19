@@ -26,8 +26,24 @@ Switch to `kb-support` without recording the credential. Ask `财务负责人需
 
 As `kb-admin`, edit `company-refund` and replace its Markdown with `data/updates/company-refund-v2.md`. Keep `arrival_rule` in its additional evidence types. Publish, ask the threshold question, and verify that the response now cites v2 with 5000 CNY. Version history retains v1 with 3000 CNY. A second identical publish should be skipped.
 
-The source-maintenance scenario uses `bluewhale-kb`; the evidence-seeking scenario uses `bluewhale`. Each tenant has an independent policy set. Switching tenants is not a policy update; publishing a new revision is.
+The source-maintenance scenario uses `bluewhale-kb`; the evidence-seeking scenario uses `bluewhale`. These tenants have independent policy sets. Switching tenants does not represent a policy change; publishing a replacement revision does.
 
 ## Runtime disclosure
 
 When using the default local profile, say: "This recording uses the reproducible local execution profile. The API, retrieval, permissions, revisions and traces are live. The configured GLM/Milvus/LangGraph path is separate." Only call it a live hosted-model run after enabling and verifying those integrations.
+
+## Document-to-citation demonstration
+
+Generate a synthetic Word source on the machine used to open the console:
+
+```bash
+python scripts/create_demo_document.py /tmp/ragops-document-demo.docx
+```
+
+The generator refuses to overwrite an existing file. As an administrator, add a document titled `Document retention standard`, select evidence type `general`, and upload the generated file. Open the stored source to show its heading hierarchy, list items and table. Ask:
+
+> What is the retention period for demonstration uploads?
+
+The answer should include `30 days`; open the citation that contains the table and show its exact source revision. In the trace, each search round shows supporting/excluded candidates and the assessment method. The default profile explicitly displays `Local lexical check`; this is not a semantic model-quality demonstration.
+
+For a verified hosted-model profile, relevance assessment uses the configured chat model. When a search lacks supporting evidence, the trace can show one alternative query, followed by another search within the existing budget. Do not promise that every question triggers a revision: complete evidence proceeds directly, an empty authorized scope stops, and an equivalent alternative is not searched again. Provider failures remain explicit failures. Controlled regression cases exercise rejection, successful revision, repeated failure, duplicate queries, revocation and search-budget limits; they are workflow-contract evidence, not live model-accuracy results.

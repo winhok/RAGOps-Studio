@@ -1,8 +1,10 @@
 # RAGOps Studio
 
-**Tenant-aware RAG operations with inspectable retrieval, governed sources, and traceable answers.**
+**Enterprise knowledge workflows with governed sources, inspectable retrieval, and verifiable citations.**
 
-RAGOps Studio is a production-oriented reference implementation for enterprise knowledge workflows. It combines a React operations console with a FastAPI RAG service that decides when retrieval is required, asks for missing user input, searches only authorized sources, and refuses answers that cannot be grounded in current source records.
+RAGOps Studio is a runnable enterprise RAG application with a React operations console and a FastAPI backend. Manage knowledge sources, inspect how an answer was retrieved, and verify its citations against the current documents the user is authorized to read.
+
+The workflow chooses between a direct response, a clarification and knowledge retrieval. It checks supporting evidence, searches again when needed within a fixed budget, and refuses business conclusions that cannot pass source validation. The application can run as one server service with a compiled web console.
 
 ![Knowledge workspace](assets/screenshots/01-workspace.png)
 
@@ -10,16 +12,29 @@ RAGOps Studio is a production-oriented reference implementation for enterprise k
 
 | Area | Implementation |
 |---|---|
-| Agentic retrieval | Direct / clarify / retrieve routes, bounded follow-up retrieval, explicit stop conditions |
+| Agentic retrieval | Direct / clarify / retrieve routes, relevance checks, one bounded query revision and explicit stop conditions |
 | Grounded answers | Server-bound chunk IDs, exact source text, source revision and citation validation |
 | Hybrid search | Dense + BM25 retrieval, RRF fusion and optional model reranking |
-| Source governance | Markdown-aware chunking, SHA-256 change detection, immutable revisions, atomic active-version switch and soft deletion |
+| Source governance | Structured Word import, table-aware chunking, SHA-256 change detection, immutable revisions, atomic active-version switch and soft deletion |
 | Access control | Server-issued credentials, tenant isolation, company/department visibility and administrator-only writes |
 | Observability | Search rounds, permission filters, candidate scores, stage timings and execution traces |
 | Evaluation | Deterministic regression cases with Recall@K, MRR, nDCG@K and keyword coverage |
 | Integrations | Milvus native hybrid adapter, Zhipu embeddings/rerank/chat, DeepSeek chat, Qdrant and OpenAI-compatible alternatives |
 
-The repository uses a **synthetic demonstration corpus** so the full workflow can be inspected publicly without exposing customer data. It demonstrates engineering patterns and system behavior; it does not claim customer production metrics or production-model accuracy.
+The included **synthetic demonstration corpus** makes the complete workflow reproducible without customer data. Its evaluation results describe regression behavior on that corpus, not production-model accuracy.
+
+## Explore the application
+
+| Scenario | What to inspect |
+|---|---|
+| Ask a refund question that needs two sources | Additional retrieval for missing evidence, both citations and the execution trace |
+| Ask whether a refund needs review without providing an amount | Clarification before retrieval |
+| Ask about an unavailable benefit | Refusal with no unsupported citations |
+| Switch between a department employee and an administrator | Permission filters and visible source sets |
+| Publish an updated policy | New active revision, retained history and citations bound to the replacement |
+| Upload a Word document | Heading and table preservation, retrieval of table values and exact source inspection |
+
+Follow the [guided walkthrough](docs/walkthrough.md) for a repeatable demonstration. The [implementation map](docs/IMPLEMENTATION-MAP.md) connects each capability to its code and verification.
 
 ## Architecture
 
@@ -85,7 +100,9 @@ After the Vite build, open `http://127.0.0.1:8000`. FastAPI serves the compiled 
 
 Copy a locally generated credential from `.secrets/access-credentials.txt` into the sign-in form. Start with **agentic-admin** to exercise the multi-source refund scenario. Credentials are random per installation; the server stores only SHA-256 digests. Do not commit, share or record the plaintext credential file.
 
-The default profile performs real ingestion, BM25/vector retrieval, RRF fusion, access checks, revision updates and local API calls. Its router is rule-based, embeddings use feature hashing, reranking is lexical, and answers are extractive. It does **not** emulate a remote LLM, a learned semantic embedding model or a running Milvus service. The selected runtime is shown in the UI.
+The default profile performs real ingestion, BM25/vector retrieval, RRF fusion, access checks, revision updates and local API calls. Its router is rule-based, embeddings use feature hashing, reranking and relevance checks are lexical, and answers are extractive. Local query revision only removes question framing; it does not invent synonyms or facts. It does **not** emulate a remote LLM, a learned semantic embedding model or a running Milvus service. The selected runtime is shown in the UI.
+
+Word uploads preserve body order, heading levels, list items and tables in the stored Markdown. Long tables repeat their headers across chunks; oversized rows fail before replacing a published revision. A synthetic upload can be generated with `python scripts/create_demo_document.py /tmp/ragops-document-demo.docx` and used in the [document-to-citation walkthrough](docs/walkthrough.md#document-to-citation-demonstration).
 
 ## LangGraph / Milvus / Zhipu profile
 
@@ -159,6 +176,11 @@ Before hosting publicly, configure HTTPS, provider secrets, reverse-proxy reques
 
 ## Further reading
 
+- [Implementation and verification map](docs/IMPLEMENTATION-MAP.md)
 - [Architecture and consistency decisions](docs/architecture.md)
 - [Operations and provider setup](docs/OPERATIONS.md)
 - [Repeatable walkthrough](docs/walkthrough.md)
+
+## License
+
+MIT. See [LICENSE](LICENSE). Third-party dependencies retain their respective licenses.

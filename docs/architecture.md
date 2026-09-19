@@ -10,8 +10,11 @@ flowchart TD
     Decide --> Clarify[Ask for missing user input]
     Decide --> Scope[SQL current revision + tenant/department scope]
     Scope --> Retrieve[Dense + BM25 → RRF → rerank]
-    Retrieve --> Assess[Assess missing evidence, status and dates]
+    Retrieve --> Assess[Assess relevance, missing evidence, status and dates]
     Assess -->|Missing type and budget remains| Scope
+    Assess -->|Previously searched type still missing| Revise[Revise query once within search budget]
+    Revise -->|Distinct query| Scope
+    Revise -->|No alternative| Refuse
     Assess -->|Complete| Generate[Generate structured answer]
     Assess -->|No new evidence or budget exhausted| Refuse[Refuse]
     Generate --> Bind[Bind IDs; check evidence coverage; revalidate current access]
@@ -19,6 +22,12 @@ flowchart TD
 ```
 
 The iteration is evidence-seeking, not an unconstrained autonomous agent. By default at most three searches run. The graph does not call business APIs or execute external side effects. A request is single-turn: after clarification, the user resubmits the question with the missing input. Conversation memory and SSE are not implemented.
+
+Before relevance assessment, candidate chunks must pass tenant/department access, current revision, validity dates and requested evidence-type checks. The local profile uses a disclosed lexical overlap check; the hosted-model profile asks for a strict list of supporting chunk IDs. Unknown IDs or provider failures stop the request safely. This judgment checks relevance, not sentence-level entailment or factual truth.
+
+If a previously searched evidence type is still missing and its authorized scope is nonempty, the workflow may revise the query once per request. Equivalent queries are not searched again, each retrieval still counts toward `max_searches`, and another unsuccessful search ends in refusal. Partial relevant evidence is retained so a revision cannot bypass required-type coverage. Assessments are cached per chunk for the current request. Trace summaries are written by the server rather than persisting model-generated explanations that might restate revoked source text.
+
+Word import uses the existing local parser dependency. It keeps paragraph/table order, headings and list items. Tables are stored as Markdown with their first row as the header; repeated headers accompany each table chunk. DOCX expansion is bounded and a row too large for a complete chunk is rejected before publication. Images, OCR, page layout and exact Word numbering are outside this parser's scope. No extra service or storage engine is required.
 
 ## Publication path
 

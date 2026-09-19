@@ -2,7 +2,7 @@
 
 ## Local startup
 
-Use the README commands from the repository root. In development, Vite serves the React console on port 5173 and proxies API calls to FastAPI on port 8000. For a production-style local run, build `frontend/dist` first; FastAPI then serves the compiled console and API from port 8000. Startup never silently seeds a database. Run bootstrap explicitly when the reference corpus is desired.
+Use the README commands from the repository root. In development, Vite serves the React console on port 5173 and proxies API calls to FastAPI on port 8000. For a production-style local run, build `frontend/dist` first; FastAPI then serves the compiled console and API from port 8000. Startup never silently seeds a database. Run bootstrap explicitly when the demonstration corpus is desired.
 
 The credentials file holds five operator-generated accounts:
 
@@ -62,7 +62,7 @@ The optional `infra/milvus.compose.yml` is the local standalone integration stac
 
 A missing credential registry gives a configuration error. Missing SDKs fail on the selected integration rather than silently running the local provider. Provider 429/5xx failures are retried with bounded backoff; exhausted attempts return a safe 502 response. Invalid document metadata returns 400/422, forbidden writes 403, hidden sources 404, and stale version updates 409.
 
-Request upload limit defaults to 2 MB, parsed content to 150,000 characters, per-document chunks to 400, and per-tenant active chunks to 5,000. The request-body middleware uses Content-Length when available; set a reverse-proxy body cap as well, especially for chunked transfer. PDF support is text extraction, not OCR. DOCX supports paragraph text, not an arbitrary document-conversion service.
+Request upload limit defaults to 2 MB, parsed content to 150,000 characters, per-document chunks to 400, and per-tenant active chunks to 5,000. The request-body middleware uses Content-Length when available; set a reverse-proxy body cap as well, especially for chunked transfer. PDF support is text extraction, not OCR. DOCX preserves body order, headings, list items and tables; images and exact page layout are outside its scope.
 
 ## Public-hosting boundary
 

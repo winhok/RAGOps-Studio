@@ -53,7 +53,7 @@ function EditForm({ document, session, busy, onClose, onPublish }: {
         <label>Expires at (optional)<input name="expires_at" defaultValue={document?.expires_at ?? ''} placeholder="2027-01-01T00:00:00+00:00" /></label>
         <label>Markdown / text content<textarea name="content" rows={7} maxLength={150000} defaultValue={document?.content ?? ''} /></label>
         <label>Or upload a source file<input type="file" name="file" accept=".md,.txt,.pdf,.docx" /></label>
-        <p className="muted small-text">Markdown is the reference ingestion path. TXT, text-based PDF and DOCX are preserved from the previous release. Maximum 2 MB.</p>
+        <p className="muted small-text">Word uploads preserve headings, list items and tables. TXT, Markdown and text-based PDF are also supported. Maximum 2 MB.</p>
         <div className="modal-actions"><button type="button" className="button ghost" onClick={onClose}>Cancel</button><button type="submit" className="button primary" disabled={busy}>{busy ? 'Publishing…' : 'Publish source'}</button></div>
       </form>
     </>

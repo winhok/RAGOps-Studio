@@ -2,12 +2,18 @@ from __future__ import annotations
 import hashlib
 from markdown_it import MarkdownIt
 from .models import Chunk, Document
+from .errors import AppError
+
+class TableParagraph(str):
+    """A parser-recognized table; pipe characters in code remain ordinary text."""
 
 def normalize_markdown(text: str) -> str:
     return text.replace('\r\n', '\n').replace('\r', '\n').strip()
 
 def markdown_sections(text: str) -> list[tuple[str, list[str]]]:
-    tokens = MarkdownIt('commonmark').parse(normalize_markdown(text))
+    normalized = normalize_markdown(text)
+    tokens = MarkdownIt('commonmark').enable('table').parse(normalized)
+    lines = normalized.splitlines()
     headings: list[str] = []
     sections: list[tuple[str, list[str]]] = []
     paragraphs: list[str] = []
@@ -15,6 +21,12 @@ def markdown_sections(text: str) -> list[tuple[str, list[str]]]:
     i = 0
     while i < len(tokens):
         token = tokens[i]
+        if token.type == 'table_open':
+            paragraphs.append(TableParagraph('\n'.join(lines[token.map[0]:token.map[1]])))
+            while tokens[i].type != 'table_close':
+                i += 1
+            i += 1
+            continue
         if token.type == 'heading_open':
             if paragraphs:
                 sections.append((current, paragraphs))
@@ -43,6 +55,24 @@ def chunk_document(document: Document, *, chunk_size: int=700, overlap: int=80) 
         limit = chunk_size - len(prefix)
         current = ''
         for paragraph in paragraphs:
+            if isinstance(paragraph, TableParagraph):
+                if current:
+                    pieces.append(prefix + current)
+                    current = ''
+                rows = paragraph.splitlines()
+                header = '\n'.join(rows[:2])
+                table = header
+                if len(header) > limit:
+                    raise AppError('Table header exceeds the chunk size; shorten its cells before publication')
+                for row in rows[2:]:
+                    if len(header) + 1 + len(row) > limit:
+                        raise AppError('Table row exceeds the chunk size; shorten its cells before publication')
+                    if len(table) + 1 + len(row) > limit:
+                        pieces.append(prefix + table)
+                        table = header
+                    table += '\n' + row
+                pieces.append(prefix + table)
+                continue
             if len(paragraph) > limit:
                 if current:
                     pieces.append(prefix + current)
